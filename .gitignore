@@ -2,8 +2,7 @@
 *.js
 node_modules
 docs
-*.d.ts
-!src/types/**/*.d.ts
+dist
 
 
 *.tar.gz

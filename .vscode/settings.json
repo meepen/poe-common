@@ -5,8 +5,7 @@
         },
         "**/*.js.map": {
             "when": "$(basename)"
-        },
-        "**/[^types]/*.d.ts": true
+        }
     },
     "javascript.preferences.importModuleSpecifierEnding": "js"
 }

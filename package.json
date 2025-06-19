@@ -1,0 +1,50 @@
+{
+    "name": "@meepen/poe-common",
+    "version": "1.0.1",
+    "description": "Common schemas for the Path of Exile API",
+    "keywords": [
+        "poe",
+        "pathofexile",
+        "api",
+        "schemas",
+        "types"
+    ],
+    "private": false,
+    "scripts": {
+        "test": "jasmine",
+        "build": "tsc",
+        "scrape": "tsx scrape.ts"
+    },
+    "devDependencies": {
+        "@types/jsdom": "^21.1.7",
+        "axios": "^1.10.0",
+        "jasmine": "^5.8.0",
+        "jsdom": "^26.1.0",
+        "typescript": "^5.8.3",
+        "tsx": "^4.20.3"
+    },
+    "type": "module",
+    "files": [
+        "src/**/*.d.ts",
+        "src/**/*.js",
+        "src/**/*.js.map",
+        "tsconfig.json",
+        "package.json"
+    ],
+    "exports": {
+        ".": {
+            "import": "./src/types/index.js",
+            "require": "./src/types/index.js",
+            "types": "./src/types/index.d.ts"
+        }
+    },
+    "author": {
+        "email": "meep@meepen.dev",
+        "name": "Meepen",
+        "url": "https://github.com/meepen"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/meepen/poe-common.git"
+    }
+}

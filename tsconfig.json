@@ -10,7 +10,8 @@
         "sourceMap": true,
         "inlineSourceMap": false,
         "declaration": true,
-        "outDir": "dist"
+        "outDir": "dist",
+        "experimentalDecorators": true
     },
     "include": ["src/**/*"],
 }

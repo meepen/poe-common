@@ -1,6 +1,6 @@
 {
     "name": "@meepen/poe-common",
-    "version": "1.0.2",
+    "version": "2.0.0",
     "description": "Common schemas for the Path of Exile API",
     "keywords": [
         "poe",
@@ -11,19 +11,21 @@
     ],
     "private": false,
     "scripts": {
-        "test": "jasmine",
+        "pretest": "npm run build",
+        "test": "vitest run",
         "prebuild": "rimraf dist",
         "build": "tsc",
-        "scrape": "tsx scrape.ts"
+        "scrape": "tsx scrape-src/main.ts"
     },
     "devDependencies": {
         "@types/jsdom": "^21.1.7",
         "axios": "^1.10.0",
-        "jasmine": "^5.8.0",
         "jsdom": "^26.1.0",
         "rimraf": "^6.0.1",
         "tsx": "^4.20.3",
-        "typescript": "^5.8.3"
+        "typescript": "^5.8.3",
+        "vite-tsconfig-paths": "^5.1.4",
+        "vitest": "^3.2.4"
     },
     "type": "module",
     "files": [
@@ -31,14 +33,17 @@
         "dist/**/*.js",
         "dist/**/*.js.map",
         "dist/**/*.d.ts",
+        "!dist/**/*.test.js",
+        "!dist/**/*.test.js.map",
+        "!dist/**/*.test.d.ts",
         "tsconfig.json",
         "package.json"
     ],
     "exports": {
         ".": {
-            "import": "./src/types/index.js",
-            "require": "./src/types/index.js",
-            "types": "./src/types/index.d.ts"
+            "import": "./dist/poe.js",
+            "require": "./dist/poe.js",
+            "types": "./dist/poe.d.ts"
         }
     },
     "author": {
@@ -49,5 +54,10 @@
     "repository": {
         "type": "git",
         "url": "https://github.com/meepen/poe-common.git"
+    },
+    "peerDependencies": {
+        "class-transformer": "^0.5.1",
+        "class-validator": "^0.14.2",
+        "reflect-metadata": "^0.2.2"
     }
 }

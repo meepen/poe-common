@@ -1,40 +1,33 @@
-// Scrapes the URL https://www.pathofexile.com/developer/docs/reference#types
-// and converts the types to TypeScript interfaces.
-
-// import axios from 'axios';
+import { DOMWindow } from "jsdom";
+import { ObjectTypeDetails } from "./object-type-details.js";
 import { JSDOM } from 'jsdom';
-import { createWriteStream } from 'fs';
-import { readFile } from 'fs/promises';
-
-const BASE_URL = 'https://www.pathofexile.com/developer/docs/reference#types';
-const OUTPUT_FILE = './src/types/poe.d.ts';
-const outStream = createWriteStream(OUTPUT_FILE);
-
-// const response = (await axios.get(BASE_URL)).data;
-const response = await readFile('./docs/docs.htm', 'utf-8');
-
-const dom = new JSDOM(response);
-const Node = dom.window.Node;
-
-const typesArticle = dom.window.document.querySelector("article#types");
-
-if (!typesArticle) {
-    throw new Error('Types article not found');
-}
-
-const tables = typesArticle.querySelectorAll('table') as NodeListOf<HTMLTableElement>;
-
-interface ObjectTypeDetails {
-    key: string;
-    isArray?: true;
-    isOptional?: true;
-    valueType: string;
-    extraInfo?: string;
-    children?: ObjectTypeDetails[];
-}
 
 const htmlTab = String.fromCharCode(0x2002) + String.fromCharCode(0x2003);
 const htmlKeyChar = String.fromCharCode(0x21B3) + String.fromCharCode(0x2003);
+
+export interface EnumTypeDetails {
+    values: Map<number, string>;
+}
+
+export type TypeDetails =
+    | { type: 'enum', name: string, subtitle?: string, details: EnumTypeDetails }
+    | { type: 'object', name: string, subtitle?: string, details: ObjectTypeDetails[] };
+
+export function htmlToData(html: string): TypeDetails[] {
+    const dom = new JSDOM(html);
+
+    const typesArticle = dom.window.document.querySelector("article#types");
+
+    if (!typesArticle) {
+        throw new Error('Types article not found');
+    }
+
+    const tables = typesArticle.querySelectorAll('table') as NodeListOf<HTMLTableElement>;
+
+    return Array.from(tables)
+        .map((table) => findTableDetails(table, dom.window))
+        .filter((val): val is NonNullable<typeof val> => val !== null)
+}
 
 function convertObjectRowsToTypeDetails(table: HTMLTableElement): ObjectTypeDetails[] | null {
     const headerKeys = Array.from(
@@ -80,17 +73,6 @@ function convertObjectRowsToTypeDetails(table: HTMLTableElement): ObjectTypeDeta
             continue;
         }
 
-        let isOptional: true | undefined = undefined;
-        if (valueType.startsWith('?')) {
-            isOptional = true;
-            valueType = valueType.slice(1); // Remove the '?' character
-        }
-
-        let isArray: true | undefined = valueType.startsWith('array of ') ? true : undefined;
-        if (isArray) {
-            valueType = valueType.slice('array of '.length); // Remove "array of "
-        }
-
         // find parent if applicable
         let parent: ObjectTypeDetails[] = typeDetails;
         while (key.startsWith(htmlTab)) {
@@ -118,18 +100,12 @@ function convertObjectRowsToTypeDetails(table: HTMLTableElement): ObjectTypeDeta
             key: key.trim(),
             valueType,
             extraInfo: extraInfo || undefined,
-            isArray,
-            isOptional,
         };
 
         parent.push(typeDetail);
     }
 
     return typeDetails;
-}
-
-interface EnumTypeDetails {
-    values: Record<number, string>;
 }
 
 function convertEnumRowsToTypeDetails(table: HTMLTableElement): EnumTypeDetails | null {
@@ -151,7 +127,7 @@ function convertEnumRowsToTypeDetails(table: HTMLTableElement): EnumTypeDetails 
         return row;
     });
 
-    const enumDetails: EnumTypeDetails = { values: {} };
+    const enumDetails: EnumTypeDetails = { values: new Map() };
     for (const row of rows) {
         const value = row['Value'];
         const info = row['Information'];
@@ -169,17 +145,13 @@ function convertEnumRowsToTypeDetails(table: HTMLTableElement): EnumTypeDetails 
         }
 
         // Store the information associated with the value
-        enumDetails.values[parsedValue] = info.trim();
+        enumDetails.values.set(parsedValue, info.trim());
     }
 
     return enumDetails;
 }
 
-export type TypeDetails =
-    | { type: 'enum', name: string, subtitle?: string, details: EnumTypeDetails }
-    | { type: 'object', name: string, subtitle?: string, details: ObjectTypeDetails[] };
-
-function findTableDetails(table: HTMLTableElement): TypeDetails | null {
+function findTableDetails(table: HTMLTableElement, { Node }: DOMWindow): TypeDetails | null {
     let header: ChildNode | null = table.previousSibling;
     let subtitle: string | undefined;
     while (header && (header.nodeType !== Node.ELEMENT_NODE || header.nodeName !== 'H3')) {
@@ -243,90 +215,5 @@ function findTableDetails(table: HTMLTableElement): TypeDetails | null {
         default:
             console.warn(`Unknown type "${typeType}" in header, skipping`);
             return null;
-    }
-}
-
-function safeName(name: string): string {
-    return name
-        .trim()
-        .replace(/[^a-zA-Z0-9_ ]/g, '')
-        .replace(/^[0-9]/, '_$&')
-        .split(' ')
-        .map((part, index) => 
-            index === 0
-                ? part
-                : part.charAt(0).toUpperCase() + part.slice(1))
-        .join('');
-}
-function toJavaScriptType(type: string, children?: ObjectTypeDetails[] | undefined): string {
-    switch (type) {
-        case 'uint':
-        case 'int':
-        case 'double':
-        case 'float':
-            return 'number';
-        case 'bool':
-            return 'boolean';
-        case 'array': // check if children is defined, and create a type from that
-            if (children && children.length > 0) {
-                return `[${children.map(child => toJavaScriptType(child.valueType, child.children)).join(', ')}]`;
-            }
-            return 'unknown[]';
-        default:
-            break;
-    }
-
-    const types = type.split(' or ').map(t => t.trim());
-    if (types.length === 1) {
-        if (types[0].indexOf(' as ') !== -1) { // this is a enum value...
-            return types[0].split(' as ')[1].trim();
-        }
-        return types[0].trim();
-    }
-    return `(${types.map((type) => toJavaScriptType(type)).join(' | ')})`;
-}
-
-function writeEnum(name: string, details: EnumTypeDetails) {
-    outStream.write(`export enum ${safeName(name)} {`);
-    for (const [value, info] of Object.entries(details.values)) {
-        outStream.write(`\n\t${safeName(info)} = ${value}, // ${info}`);
-    }
-
-    outStream.write(`\n}`);
-}
-
-function writeObject(name: string, details: ObjectTypeDetails[]) {
-    outStream.write(`export interface ${safeName(name)} {`);
-    for (const detail of details) {
-        if (detail.extraInfo) {
-            outStream.write(`\n  /* ${detail.extraInfo} */`);
-        }
-        outStream.write(`\n  ${safeName(detail.key)}${detail.isOptional ? '?' : ''}: ${toJavaScriptType(detail.valueType, detail.children)}${detail.isArray ? '[]' : ''};`);
-    }
-    outStream.write(`\n}`);
-}
-
-for (
-    const type of Array.from(tables)
-        .map(findTableDetails)
-        .filter((val): val is NonNullable<typeof val> => val !== null)
-) {
-    outStream.write(`
-/**
- * ${type.type} ${type.name}${type.subtitle ? `
- * ${type.subtitle}` : ''}
- * Generated from ${BASE_URL}
- */
-`);
-    switch (type.type) {
-        case 'enum':
-            writeEnum(type.name, type.details);
-            break;
-        case 'object':
-            writeObject(type.name, type.details);
-            break;
-        default:
-            console.warn(`Unknown data`);
-            break;
     }
 }
